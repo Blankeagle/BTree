@@ -14,6 +14,15 @@
 #define PLUSE_MAX_ENTERIRES 64 //叶子节点的最大条目数
 #define PLUSE_MAX_LEVEL 10     //树的最大高度
 
+#define list_entry(ptr, type, member) \
+    ((type *)((char *)(ptr) - (size_t)(&((type *)0)->member))) //link地址减去偏移量
+
+#define list_next_entry(pos, member) \
+    list_entry((pos)->member.next, typeof(*(pos)), member)
+
+#define list_prev_entry(pos, member) \              
+        list_entry((pos)->member.prev, typeof(*(pos)), member) //leaf,link
+
 typedef int key_t; // 键值类型
 struct list_head
 {
@@ -38,6 +47,11 @@ static inline void __list_del(list_head *prev, list_head *next)
     prev->next = next;
     next->prev = prev;
 }
+static inline void list_del(struct list_head *link)
+{
+    __list_del(link->prev, link->next);
+    list_init(link);
+}
 
 struct bplus_node //通用型节点
 {
@@ -54,7 +68,7 @@ struct bplus_non_leaf //非叶子节点
     int parent_key_idx;
     struct bplus_non_leaf *parent;
     struct list_head link;
-    int children;
+    int children; //孩子数值得是指针数，比key大一
     int key[PLUSE_MAX_ORDER - 1];
     struct bplus_node *sub_ptr[PLUSE_MAX_ORDER]; //子节点指针要比key多一个
 };
@@ -62,10 +76,10 @@ struct bplus_leaf //叶子节点
 {
     /* data */
     int type;
-    int parent_key_idx;
+    int parent_key_idx; //从-1开始
     struct bplus_non_leaf *parent;
     struct list_head link;
-    int entries;  //数据个税
+    int entries; //数据个税
     int key[PLUSE_MAX_ENTERIRES];
     int data[PLUSE_MAX_ENTERIRES]; //数据，一个key 对应一个数据
 };
@@ -86,13 +100,16 @@ class bplustree
   public:
     bplustree();
     ~bplustree();
-    int bplus_tree_dump();                            //遍历所有元数据
-    int bplus_tree_get(key_t key);                    //查找数据
-    int bplus_tree_put(key_t key, int data);          //插入数据
-    int bplus_tree_get_range(key_t key1, key_t key2); //
-    int parent_node_build(bplus_node *left,bplus_node *right,key_t key,int level); //
-    int non_leaf_insert(bplus_non_leaf *node,bplus_node *l_ch,bplus_node *r_ch,key_t key,int level);
+    int bplus_tree_dump();                                                            //遍历所有元数据
+    int bplus_tree_get(key_t key);                                                    //查找数据
+    int bplus_tree_put(key_t key, int data);                                          //插入数据
+    int bplus_tree_get_range(key_t key1, key_t key2);                                 //
+    int parent_node_build(bplus_node *left, bplus_node *right, key_t key, int level); //
+    int non_leaf_insert(bplus_non_leaf *node, bplus_node *l_ch, bplus_node *r_ch, key_t key, int level);
     void init(int order, int entries);
+    int bplus_tree_delete(key_t key);
+    int leaf_remove(bplus_leaf *leaf, key_t key);
+    void non_leaf_remove(bplus_non_leaf *node, int remove);
 };
 
 void bplustree::init(int order, int enteies)
@@ -106,7 +123,6 @@ bplustree::bplustree()
 
 bplustree::~bplustree()
 {
-
 }
 
 #endif //_BPlus_TREE_H
